@@ -63,13 +63,11 @@ class ShellTool:
 class TargetSpecLoader:
     @staticmethod
     def load() -> list[str]:
-        if TARGET_SPEC_PATH.exists():
-            with TARGET_SPEC_PATH.open("r", encoding="utf-8") as f:
-                data = json.load(f)
-        else:
-            sample = ROOT / "target_spec_sample.json"
-            with sample.open("r", encoding="utf-8") as f:
-                data = json.load(f)
+        if not TARGET_SPEC_PATH.exists():
+            raise FileNotFoundError(f"Target spec not found: {TARGET_SPEC_PATH}")
+
+        with TARGET_SPEC_PATH.open("r", encoding="utf-8") as f:
+            data = json.load(f)
 
         targets = data.get("targets", [])
         if not isinstance(targets, list) or not all(isinstance(t, str) and t.strip() for t in targets):

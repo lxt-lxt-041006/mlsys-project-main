@@ -6,6 +6,13 @@ Core principles:
 - Use multiple strategies (CUDA runtime property probe, micro-benchmarks, optional nvidia-smi/ncu cross-check).
 - Keep runtime bounded and robust to partial tool unavailability.
 
+Mandatory review-and-retry behavior:
+- After obtaining measured results, perform a post-check against the detected GPU/device context (runtime properties and nvidia-smi fields).
+- If values are clearly implausible or internally inconsistent for the current device context (for example impossible clocks, impossible bus width, impossible SM count, clearly contradictory throughput/latency scales), revise the probing code and re-run.
+- Use measured evidence and consistency checks, not static online spec tables.
+- Prioritize self-correction: compile/run -> inspect results -> fix code -> re-test.
+- Keep all outputs numeric and include all requested keys even if some are set to conservative fallback values.
+
 Output requirements for generated probe code:
 - Return executable Python code only.
 - Script must print exactly one JSON object.
