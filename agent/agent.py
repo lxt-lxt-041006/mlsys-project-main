@@ -19,8 +19,21 @@ OUTPUT_PATH = ROOT / "output.json"
 WORK_DIR = ROOT / ".agent_workspace"
 DIAG_PATH = WORK_DIR / "diagnostics.json"
 GENERATED_CUDA_PATH = WORK_DIR / "generated_probe.cu"
+LLM_TRACE_PATH = WORK_DIR / "llm_trace.jsonl"
+ERROR_SEED_PATH = WORK_DIR / "seed_error.txt"
 PROMPT_DIR = ROOT / "agent" / "prompts"
-MAX_RETRY = 3
+
+
+def _read_max_retry() -> int:
+    raw = os.getenv("AGENT_MAX_RETRY", "10").strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        value = 10
+    return max(1, value)
+
+
+MAX_RETRY = _read_max_retry()
 
 
 @dataclass
@@ -74,6 +87,23 @@ class ProbeAgent:
         self._python_probe_cache: dict[str, float] | None = None
         self._driver_probe_cache: dict[str, float] | None = None
         self.diag: dict[str, Any] = {}
+
+    def _load_error_seed(self) -> str:
+        if not ERROR_SEED_PATH.exists():
+            return ""
+        try:
+            text = ERROR_SEED_PATH.read_text(encoding="utf-8").strip()
+            return text[:5000]
+        except Exception:
+            return ""
+
+    def _trace_llm(self, stage: str, payload: dict[str, Any]) -> None:
+        item = {"stage": stage, **payload}
+        try:
+            with LLM_TRACE_PATH.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(item, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
 
     def _load_system_prompt(self) -> str:
         prompt_file = PROMPT_DIR / "system_probe.txt"
@@ -190,6 +220,8 @@ class ProbeAgent:
             "3) Also output these keys when available: physical_sm_count, max_shmem_per_block_kb, l2_cache_size_kb, l2_cache_size_bytes, warp_size, max_threads_per_block, max_threads_per_sm, global_memory_size_mb, actual_core_clock_mhz, memory_clock_mhz.\n"
             "4) Never use static online spec tables.\n"
             "5) Output JSON only to stdout in main().\n"
+            "6) C++ compatibility requirement: avoid passing lambda to function pointer parameter. "
+            "If using a timing helper, accept callable via template or std::function.\n"
             f"Requested targets: {json.dumps(self.targets, ensure_ascii=False)}\n"
             + (f"Previous compile/runtime error:\n{previous_error}\n" if previous_error else "")
             + "Return raw CUDA code only."
@@ -197,6 +229,13 @@ class ProbeAgent:
 
     def _request_cuda_probe_code(self, previous_error: str | None = None) -> str:
         prompt = self._build_cuda_probe_prompt(previous_error=previous_error)
+        self._trace_llm(
+            "request",
+            {
+                "prompt_preview": prompt[:3000],
+                "previous_error_preview": (previous_error or "")[:1000],
+            },
+        )
         response = client.chat.completions.create(
             model=os.getenv("BASE_MODEL", ""),
             messages=[
@@ -205,6 +244,13 @@ class ProbeAgent:
             ],
         )
         content = response.choices[0].message.content or ""
+        self._trace_llm(
+            "response",
+            {
+                "response_preview": content[:3000],
+                "response_len": len(content),
+            },
+        )
         return self._extract_fenced_code(content)
 
     def _run_llm_cuda_probe(self, previous_error: str | None = None) -> tuple[dict[str, Any] | None, str]:
@@ -255,9 +301,15 @@ class ProbeAgent:
         return self._driver_probe_cache
 
     def run(self) -> None:
-        last_error: str | None = None
+        seed_error = self._load_error_seed()
+        last_error: str | None = seed_error if seed_error else None
+        error_history: list[str] = []
         final_values: dict[str, Any] | None = None
         cuda_path_error: str | None = None
+
+        if seed_error:
+            self.diag["seed_error_loaded"] = True
+            self.diag["seed_error_preview"] = seed_error[:300]
 
         for attempt in range(1, MAX_RETRY + 1):
             print(f"[Agent] attempt {attempt}/{MAX_RETRY}")
@@ -275,7 +327,15 @@ class ProbeAgent:
                     cuda_path_error = cuda_info
             except Exception as exc:
                 cuda_path_error = f"LLM->CUDA path exception: {type(exc).__name__}: {exc}"
-            last_error = cuda_path_error
+
+            # 关键：把运行时报错自动喂回下一轮 LLM，增强修复能力
+            if cuda_path_error:
+                error_history.append(cuda_path_error)
+            recent = error_history[-2:]
+            last_error = "\n\n".join(
+                [f"[attempt-{len(error_history) - len(recent) + i + 1}] {msg}" for i, msg in enumerate(recent)]
+            )
+
             print(f"[Agent] llm->cuda failed in attempt {attempt}.")
 
         if final_values is None:
