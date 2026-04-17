@@ -1,0 +1,18 @@
+{
+  "targets": [
+    "physical_sm_count",
+    "actual_core_clock_mhz",
+    "actual_boost_clock_mhz",
+    "memory_clock_mhz",
+    "peak_fp32_tflops",
+    "max_shmem_per_block_kb",
+    "l2_cache_size_kb",
+    "l2_cache_size_bytes",
+    "warp_size",
+    "max_threads_per_block",
+    "max_threads_per_sm",
+    "global_memory_size_mb",
+    "gpu_temp_c",
+    "power_limit_w"
+  ]
+}
