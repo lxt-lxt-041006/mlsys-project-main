@@ -89,8 +89,15 @@ class ProbeAgent:
     def _extract_fenced_code(text: str) -> str:
         if not text:
             return ""
-        fence = re.search(r"```(?:python)?\s*(.*?)```", text, flags=re.DOTALL | re.IGNORECASE)
-        return fence.group(1).strip() if fence else text.strip()
+        # 支持 ```cpp / ```cuda / ```c++ / ```python 等任意围栏语言
+        fence = re.search(r"```[a-zA-Z0-9_+\-]*\s*(.*?)```", text, flags=re.DOTALL)
+        code = fence.group(1).strip() if fence else text.strip()
+
+        # 某些模型会把语言标记误放进正文首行（如: cpp / cuda）
+        lines = code.splitlines()
+        if lines and lines[0].strip().lower() in {"cpp", "c++", "cuda", "cc", "c"}:
+            code = "\n".join(lines[1:]).strip()
+        return code
 
     @staticmethod
     def _extract_json_blob(text: str) -> dict[str, Any] | None:
