@@ -1,0 +1,6 @@
+{
+  "detected_gpu_name": "NVIDIA GeForce RTX 3090",
+  "expected_gpu_regex": "",
+  "warnings": [],
+  "probe_path": "llm_cuda"
+}

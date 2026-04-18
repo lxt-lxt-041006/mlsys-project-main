@@ -1,0 +1,3 @@
+[Agent] attempt 1/10
+[Agent] llm->cuda probe succeeded.
+[Agent] wrote /workspace/output.json
