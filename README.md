@@ -3,7 +3,25 @@
 This is a very rudimentary agent implementation. It does not provide modularization between the agent and the tools, and the implementations of its various functions are highly coupled. It is provided for reference only. 
 
 # !!! NOTICE !!!
-Now you can test your submission with the `/submit-test`. See more details below.
+- A new server with access to the external internet (such as ChatGPT) has been added: `10.176.34.113`
+
+- The new server supports **preemptive scheduling** with the following priority order:
+
+`/submit > /submit-test > /start`
+
+If there are no idle resources available, a higher-priority request may directly terminate a lower-priority task that started earlier.
+
+If you start a CPU-only container without using a GPU and only want to access your files, this operation does not participate in preemptive scheduling, and the container will not be preempted.
+
+- The `/start` interface now returns a `mission_id`.
+
+After starting a task, you should use `/submit_status` with the `mission_id` to check the SSH port assigned to the task.
+
+
+- Each container started by `/start` can run for **at most 10 hours**.
+
+After 10 hours, the container will be automatically terminated by the system.
+
 
 # Submit Your Agent
 
