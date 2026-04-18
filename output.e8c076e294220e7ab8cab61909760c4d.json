@@ -1,0 +1,10 @@
+{
+  "launch__sm_count": 82.0,
+  "dram__bytes_read.sum.per_second": 384749118742.0,
+  "dram__bytes_write.sum.per_second": 384749118742.0,
+  "device__attribute_max_gpu_frequency_khz": 1695000.0,
+  "device__attribute_max_mem_frequency_khz": 9751000.0,
+  "device__attribute_fb_bus_width": 384.0,
+  "sm__throughput.avg.pct_of_peak_sustained_elapsed": 6.068168,
+  "gpu__compute_memory_throughput.avg.pct_of_peak_sustained_elapsed": 82.202919
+}
